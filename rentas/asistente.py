@@ -89,29 +89,11 @@ def es_pregunta_como_rentar(texto):
     return any(f in t for f in frases)
 
 
-def es_pregunta_horarios(texto):
-    t = texto.lower()
-    claves = [
-        "horario", "horarios", "a que hora", "a qué hora",
-        "hora abren", "hora cierran", "abren los", "dias atienden", "días atienden",
-        "cuando abren", "cuándo abren", "abierto"
-    ]
-    return any(c in t for c in claves)
-
-
 def responder(mensaje):
     modelo = cargar_modelo()
     intencion = modelo.predict([mensaje])[0]
 
     cat_slug, cat_nombre = detectar_categoria(mensaje)
-
-    # horarios del negocio
-    if intencion == "horarios" or es_pregunta_horarios(mensaje):
-        respuesta = (
-            "Nuestro horario de atención y entrega/devolución de herramientas es de "
-            "lunes a sábado de 8:00 AM a 6:00 PM. Los domingos nuestras sucursales permanecen cerradas."
-        )
-        return {"intencion": "horarios", "respuesta": respuesta}
 
     # si pregunta como pedir renta
     if intencion == "como_rentar" or es_pregunta_como_rentar(mensaje):
@@ -154,12 +136,12 @@ def responder(mensaje):
             total = Herramienta.objects.count()
             respuesta = (
                 f"Contamos con {total} herramientas y kits de trabajo divididos en 6 categorías:\n\n"
-                "• Demolición y Construcción (rotomartillos, martillos demoledores)\n"
-                "• Carpintería (sierras circulares, lijadoras, kits completos)\n"
-                "• Plomería (bombas destapadoras, terrajas)\n"
-                "• Electricidad (multímetros, guías jalacables)\n"
-                "• Jardinería y Poda (desbrozadoras, motosierras)\n"
-                "• Pintura y Acabados (compresores, rodillos, pistolas)\n\n"
+                "• Demolición y Construcción (rotomartillo individual y kit completo)\n"
+                "• Carpintería (lijadora orbital y kit integral)\n"
+                "• Plomería (bomba destapadora y kit profesional)\n"
+                "• Electricidad (taladro percutor y kit completo)\n"
+                "• Jardinería y Poda (cortasetos y kit de poda)\n"
+                "• Pintura y Acabados (pistola de pintar y kit de acabados)\n\n"
                 "Puedes pedirme herramientas de alguna categoría en específico (por ejemplo: 'qué tienen de plomería') "
                 "o ver todo el inventario en la pestaña 'Catálogo'."
             )

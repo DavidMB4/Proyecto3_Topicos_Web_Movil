@@ -94,7 +94,7 @@ class ApiService {
         body: json.encode(rentaData),
       ).timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         final data = json.decode(utf8.decode(response.bodyBytes));
         return Renta.fromJson(data as Map<String, dynamic>);
       } else {

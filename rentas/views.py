@@ -1,5 +1,8 @@
 import json
 from decimal import Decimal
+from datetime import timedelta
+from django.utils import timezone
+from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
@@ -119,22 +122,46 @@ def registrar_renta(request):
     if not cliente_nombre or not herramienta_sugerida:
         return JsonResponse({"error": "faltan datos para registrar la renta"}, status=400)
 
+    # Evitar doble clic o peticiones duplicadas recientes (idempotencia)
+    hace_poco = timezone.now() - timedelta(seconds=20)
+    renta_duplicada = Renta.objects.filter(
+        cliente_nombre__iexact=cliente_nombre,
+        herramienta_sugerida__iexact=herramienta_sugerida,
+        duracion_dias=duracion_dias,
+        fecha_creacion__gte=hace_poco
+    ).order_by('-id').first()
+
+    if renta_duplicada:
+        return JsonResponse({
+            "folio": renta_duplicada.id,
+            "codigo_folio": renta_duplicada.codigo_folio,
+            "mensaje": f"Renta {renta_duplicada.codigo_folio} ya registrada previamente",
+            "cliente": renta_duplicada.cliente_nombre,
+            "herramienta": renta_duplicada.herramienta_sugerida,
+            "es_kit": renta_duplicada.es_kit,
+            "duracion_dias": renta_duplicada.duracion_dias,
+            "costo_total": float(renta_duplicada.costo_total),
+            "estado": renta_duplicada.estado,
+            "fecha": renta_duplicada.fecha_creacion.strftime("%Y-%m-%d %H:%M:%S")
+        }, status=200, json_dumps_params={"ensure_ascii": False})
+
     item_catalogo = Herramienta.objects.filter(nombre__iexact=herramienta_sugerida).first()
     precio_dia = item_catalogo.precio_dia if item_catalogo else Decimal("300.00")
     costo_total = precio_dia * Decimal(str(duracion_dias))
 
-    renta = Renta.objects.create(
-        cliente_nombre=cliente_nombre,
-        herramienta_sugerida=herramienta_sugerida,
-        es_kit=es_kit,
-        tipo_trabajo=tipo_trabajo,
-        duracion_dias=duracion_dias,
-        costo_total=costo_total,
-        estado='Registrado',
-        confianza_modelo=confianza_modelo,
-        corregido_por_reglas=corregido_por_reglas,
-        motivo_regla=motivo_regla
-    )
+    with transaction.atomic():
+        renta = Renta.objects.create(
+            cliente_nombre=cliente_nombre,
+            herramienta_sugerida=herramienta_sugerida,
+            es_kit=es_kit,
+            tipo_trabajo=tipo_trabajo,
+            duracion_dias=duracion_dias,
+            costo_total=costo_total,
+            estado='Registrado',
+            confianza_modelo=confianza_modelo,
+            corregido_por_reglas=corregido_por_reglas,
+            motivo_regla=motivo_regla
+        )
 
     return JsonResponse({
         "folio": renta.id,

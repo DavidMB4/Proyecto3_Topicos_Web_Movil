@@ -84,6 +84,8 @@ class _RecomendadorScreenState extends State<RecomendadorScreen> {
   }
 
   Future<void> _confirmarRenta() async {
+    // Evitar doble clic accidental si ya se está procesando o ya se confirmó
+    if (_cargando || _rentaRegistrada != null) return;
     if (_recomendacion == null) return;
     final nombre = _clienteController.text.trim();
     if (nombre.isEmpty) {
@@ -96,6 +98,7 @@ class _RecomendadorScreenState extends State<RecomendadorScreen> {
     setState(() {
       _errorCliente = null;
       _cargando = true;
+      _error = '';
     });
 
     final herramientaFinal = _herramientaElegida ?? _recomendacion!.eleccion;
@@ -134,19 +137,23 @@ class _RecomendadorScreenState extends State<RecomendadorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _construirFormularioTrabajo(),
-            if (_cargando)
-              const Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            if (_error.isNotEmpty) _construirMensajeError(),
-            if (_recomendacion != null) ...[
-              _construirTarjetaRecomendacion(),
-              _construirRankingAlternativas(),
-              _construirConfirmacionRenta(),
+            // Si ya se confirmó la renta, mostramos la vista oficial del folio/ticket para evitar duplicados
+            if (_rentaRegistrada != null)
+              _construirVistaExitoRenta()
+            else ...[
+              _construirFormularioTrabajo(),
+              if (_cargando)
+                const Padding(
+                  padding: EdgeInsets.all(24.0),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              if (_error.isNotEmpty) _construirMensajeError(),
+              if (_recomendacion != null) ...[
+                _construirTarjetaRecomendacion(),
+                _construirRankingAlternativas(),
+                _construirConfirmacionRenta(),
+              ],
             ],
-            if (_rentaRegistrada != null) _construirTicketFolio(),
           ],
         ),
       ),
@@ -545,14 +552,23 @@ class _RecomendadorScreenState extends State<RecomendadorScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  icon: const Icon(Icons.shopping_bag_outlined),
-                  label: const Text('Confirmar renta'),
+                  icon: _cargando
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.shopping_bag_outlined),
+                  label: Text(_cargando ? 'Registrando orden...' : 'Confirmar renta'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF96302),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  onPressed: _cargando ? null : _confirmarRenta,
+                  onPressed: (_cargando || _rentaRegistrada != null) ? null : _confirmarRenta,
                 ),
               ),
             ],
@@ -562,55 +578,165 @@ class _RecomendadorScreenState extends State<RecomendadorScreen> {
     );
   }
 
-  Widget _construirTicketFolio() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16.0),
-      child: Card(
-        color: Colors.green.shade50,
-        shape: RoundedRectangleBorder(
-          side: const BorderSide(color: Colors.green, width: 2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              const Text(
-                'Renta registrada',
-                style: TextStyle(
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14),
+  Widget _construirVistaExitoRenta() {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFF10B981), width: 2),
+      ),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Color(0xFFD1FAE5),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 6),
-              Text(
-                _rentaRegistrada!.codigoFolio,
-                style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green),
+              child: const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF059669),
+                size: 56,
               ),
-              Text(
-                'Registro #${_rentaRegistrada!.folio}',
-                style: TextStyle(fontSize: 12, color: Colors.green.shade800),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '¡Renta Confirmada con Éxito!',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF065F46),
               ),
-              const Divider(),
-              Text('Cliente: ${_rentaRegistrada!.cliente}'),
-              Text('Herramienta: ${_rentaRegistrada!.herramientaSugerida}'),
-              Text('Duración: ${_rentaRegistrada!.duracionDias} días'),
-              Text(
-                'Costo Total: \$${_rentaRegistrada!.costoTotal.toStringAsFixed(2)} MXN',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Tu orden se registró correctamente y no se generarán cobros duplicados.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Estado: ${_rentaRegistrada!.estado}',
-                style: const TextStyle(color: Colors.teal, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
               ),
-            ],
-          ),
+              child: Column(
+                children: [
+                  const Text(
+                    'CÓDIGO DE FOLIO OFICIAL',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SelectableText(
+                    _rentaRegistrada!.codigoFolio,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF047857),
+                    ),
+                  ),
+                  Text(
+                    'Registro #${_rentaRegistrada!.folio}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  const Divider(height: 24),
+                  _filaDetalleTicket('Cliente:', _rentaRegistrada!.cliente),
+                  const SizedBox(height: 8),
+                  _filaDetalleTicket(
+                    'Herramienta:',
+                    '${_rentaRegistrada!.herramientaSugerida} (${_rentaRegistrada!.esKit ? "Kit Completo" : "Individual"})',
+                  ),
+                  const SizedBox(height: 8),
+                  _filaDetalleTicket('Duración:', '${_rentaRegistrada!.duracionDias} día(s)'),
+                  const SizedBox(height: 8),
+                  _filaDetalleTicket('Estado:', _rentaRegistrada!.estado, esEstado: true),
+                  const Divider(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Total a Pagar:',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '\$${_rentaRegistrada!.costoTotal.toStringAsFixed(2)} MXN',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFF96302),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.add_shopping_cart_rounded),
+                label: const Text('Realizar otra renta o recomendación'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF96302),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _rentaRegistrada = null;
+                    _recomendacion = null;
+                    _herramientaElegida = null;
+                    _clienteController.clear();
+                    _error = '';
+                  });
+                },
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _filaDetalleTicket(String etiqueta, String valor, {bool esEstado = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          etiqueta,
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+        ),
+        Flexible(
+          child: Text(
+            valor,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: esEstado ? const Color(0xFF047857) : Colors.black87,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
